@@ -134,7 +134,7 @@
                      The title spans the full width with equal side gutters, so it centres on the pill
                      rather than on whatever space the side icons leave over. -->
                 <Grid x:Name="CollapsedLayer" VerticalAlignment="Top" Margin="0,-1,0,0">
-                    <Border Width="20" Height="20" CornerRadius="6" Margin="11,0,0,0"
+                    <Border x:Name="PillArt" Width="20" Height="20" CornerRadius="6" Margin="11,0,0,0"
                             HorizontalAlignment="Left" VerticalAlignment="Center"
                             Visibility="{Binding PillShowsArt, Converter={StaticResource Vis}}">
                         <Border.Background>
@@ -151,7 +151,7 @@
                     </ui:MarqueeText>
 
                     <Grid Width="26" Margin="0,0,9,0" HorizontalAlignment="Right" VerticalAlignment="Center">
-                        <ui:SpectrumBars Width="26" Height="16" Fill="{Binding AccentBrush}"
+                        <ui:SpectrumBars x:Name="PillBars" Width="26" Height="16" Fill="{Binding AccentBrush}"
                                          Visibility="{Binding PillShowsBars, Converter={StaticResource Vis}}" />
                         <TextBlock Style="{StaticResource Glyph}" Text="&#xE769;" FontSize="12" Foreground="#A6A6B0"
                                    Visibility="{Binding PillShowsPaused, Converter={StaticResource Vis}}" />
@@ -399,7 +399,9 @@
                                         <RowDefinition Height="*" />
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
+                                    <!-- ListBox resets Foreground to the system text colour, so set it back explicitly. -->
                                     <ListBox x:Name="ShelfList" ItemsSource="{Binding Shelf.Items}" Background="Transparent" BorderThickness="0"
+                                             Foreground="#F2F2F5"
                                              ScrollViewer.HorizontalScrollBarVisibility="Hidden" ScrollViewer.VerticalScrollBarVisibility="Disabled"
                                              PreviewMouseWheel="OnShelfWheel" Focusable="False">
                                         <ListBox.ItemsPanel>

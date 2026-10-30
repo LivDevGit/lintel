@@ -42,6 +42,9 @@ public sealed class ShelfService
 
     public ObservableCollection<ShelfItem> Items { get; } = new();
 
+    /// <summary>Off in demo mode, so sample items never overwrite the real shelf.</summary>
+    public bool Persist { get; set; } = true;
+
     public void Load()
     {
         try
@@ -100,7 +103,7 @@ public sealed class ShelfService
     public void Remove(ShelfItem item)
     {
         Items.Remove(item);
-        if (item.IsSnippet)
+        if (item.IsSnippet && Persist)
         {
             try { File.Delete(item.Path); } catch { }
         }
@@ -126,6 +129,7 @@ public sealed class ShelfService
 
     private void Save()
     {
+        if (!Persist) return;
         try
         {
             Directory.CreateDirectory(SettingsStore.Folder);

@@ -13,6 +13,17 @@ public enum IslandStyle { Floating, Attached }
 public enum AccentMode { System, AlbumArt, Custom }
 public enum IslandTab { Home, Shelf }
 
+/// <summary>What the island does when an app's title bar or tabs are underneath it.</summary>
+public enum TopEdgeMode
+{
+    /// <summary>Shrink to a thin click-through bar while an app is under it.</summary>
+    Slim,
+    /// <summary>Reserve a strip at the top of the display so maximized apps start below it.</summary>
+    Reserve,
+    /// <summary>Always float over apps as a full pill.</summary>
+    Overlay,
+}
+
 public sealed class AppSettings : ObservableObject
 {
     // General
@@ -52,6 +63,9 @@ public sealed class AppSettings : ObservableObject
 
     private int _closeDelayMs = 450;
     public int CloseDelayMs { get => _closeDelayMs; set => Set(ref _closeDelayMs, Math.Clamp(value, 100, 3000)); }
+
+    private TopEdgeMode _topEdge = TopEdgeMode.Slim;
+    public TopEdgeMode TopEdge { get => _topEdge; set => Set(ref _topEdge, value); }
 
     // OLED care
     private bool _hideWhenIdle;

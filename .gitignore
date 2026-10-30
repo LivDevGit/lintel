@@ -4,6 +4,7 @@ obj/
 publish/
 *.user
 .vs/
+demo-frames/
 
 # Third-party reference material: never commit these
 *.dmg

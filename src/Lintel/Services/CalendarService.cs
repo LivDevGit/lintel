@@ -33,6 +33,14 @@ public sealed class CalendarService
         _timer.Tick += async (_, _) => await RefreshAsync();
     }
 
+    /// <summary>Demo mode: show sample events instead of fetching feeds.</summary>
+    public void Inject(IReadOnlyList<CalendarEvent> events)
+    {
+        Events = events;
+        LastError = null;
+        Changed?.Invoke();
+    }
+
     public void Start()
     {
         _timer.Start();

@@ -1,7 +1,33 @@
+<p align="center">
+  <img src="docs/media/banner.png" alt="Lintel: a dynamic island for the top of Windows 11" width="100%">
+</p>
+
 # Lintel
 
 A dynamic island for the top of your Windows 11 screen. It rests as a small pill, shows what's playing, flashes
 volume, brightness and power changes, keeps today's agenda one hover away, and holds files you drop on it.
+
+## See it in action
+
+**Something starts playing.** The island announces the track, then the pill shows the cover, the title and a live
+visualizer. Open it for controls, seeking and today's agenda.
+
+<p align="center"><img src="docs/media/music.webp" alt="A song starts, the island opens to show playback controls and the agenda, then skips to the next track" width="640"></p>
+
+**Plugging in and unplugging.** A short notice shows the charge, and how long until full or how long it will last.
+
+<p align="center"><img src="docs/media/power.webp" alt="Charging and On battery notices under the pill" width="460"></p>
+
+**Volume.** Changes show up as a level meter, so you can keep your eyes where they were.
+
+<p align="center"><img src="docs/media/volume.webp" alt="Volume level meter under the pill" width="460"></p>
+
+**Shelf.** Drop files, images, text or links on the island to park them, then drag them out wherever you need them.
+
+<p align="center"><img src="docs/media/shelf.webp" alt="The shelf holding a zip, an image, a PDF, a text file and a Word document" width="640"></p>
+
+<sub>The demos are recorded by the app itself (`Lintel.exe --demo <folder>`) with a made-up track, generated cover
+art and simulated power events, then composed with `tools/make_media.py`.</sub>
 
 ## Features
 
@@ -17,6 +43,17 @@ volume, brightness and power changes, keeps today's agenda one hover away, and h
 - **Multi-monitor**: main display, a specific display, every display, or whichever one your pointer is on.
 - **Keeps out of the way**: hides in fullscreen apps, can stay out of screenshots and recordings, and scrolling over
   it changes the volume.
+
+### When an app is under the island
+
+Windows has no reserved strip at the top like the macOS menu bar, so browser tabs, title bars and search boxes can sit
+right where the island is. You choose what happens (Settings → Island):
+
+| Option | What it does |
+|---|---|
+| **Slim down** (default) | Over a maximized app, the pill shrinks to a thin bar that clicks pass through, so tabs and search boxes keep working. Rest the pointer at the very top edge to open it. |
+| **Reserve space at the top** | Keeps a 24 px strip free, like a top taskbar, so maximized apps start below the island. |
+| **Stay on top as usual** | The pill always floats over whatever is underneath. |
 
 Open it by resting the pointer on it, clicking it, or pressing **Ctrl+Alt+L** (you can change this in Settings).
 Right-click the tray icon for Settings and Quit.
@@ -48,6 +85,16 @@ To get a self-contained single file that needs no installed runtime:
 
 ```bash
 dotnet publish src/Lintel/Lintel.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
+```
+
+To regenerate the README media after UI changes (needs Python with Pillow):
+
+```bash
+src/Lintel/bin/Release/net8.0-windows10.0.22621.0/Lintel.exe --demo demo-frames
+```
+
+```bash
+python tools/make_media.py demo-frames docs/media
 ```
 
 ## Privacy

@@ -30,6 +30,8 @@ public sealed class IslandManager : IDisposable
 
     public IEnumerable<IntPtr> Handles => _windows.Select(w => w.Handle);
 
+    public IReadOnlyList<IslandWindow> Windows => _windows;
+
     public static string Describe(Forms.Screen s, int index) =>
         $"Display {index + 1}{(s.Primary ? " (main)" : "")} — {s.Bounds.Width}×{s.Bounds.Height}";
 

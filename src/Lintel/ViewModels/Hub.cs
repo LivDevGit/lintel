@@ -62,9 +62,21 @@ public sealed class Hub : ObservableObject, IDisposable
         UpdateAccent();
     }
 
-    public async Task StartAsync()
+    /// <summary>
+    /// Demo mode wires everything up but starts no real sources: the demo director injects
+    /// made-up media, power and calendar events, and nothing is saved.
+    /// </summary>
+    public async Task StartAsync(bool demo = false)
     {
-        Shelf.Load();
+        if (demo)
+        {
+            Shelf.Persist = false;
+            Spectrum.Simulated = true;
+        }
+        else
+        {
+            Shelf.Load();
+        }
         Shelf.Items.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasShelfItems));
 
         Media.Changed += OnMediaChanged;
@@ -77,12 +89,15 @@ public sealed class Hub : ObservableObject, IDisposable
         Downloads.Completed += OnDownloadCompleted;
         Settings.PropertyChanged += OnSettingChanged;
 
-        Volume.Start();
-        Brightness.Start();
-        Battery.Start();
-        if (Settings.WatchDownloads) Downloads.Start();
-        if (Settings.CalendarEnabled) Calendar.Start();
-        await Media.StartAsync();
+        if (!demo)
+        {
+            Volume.Start();
+            Brightness.Start();
+            Battery.Start();
+            if (Settings.WatchDownloads) Downloads.Start();
+            if (Settings.CalendarEnabled) Calendar.Start();
+            await Media.StartAsync();
+        }
 
         _clock.Tick += (_, _) => OnClock();
         _clock.Start();
@@ -274,6 +289,9 @@ public sealed class Hub : ObservableObject, IDisposable
         if (!Settings.ShowBrightnessHud) return;
         PeekRequested?.Invoke(new Peek(PeekKind.Brightness, "", "Brightness", $"{level}%", level / 100.0));
     }
+
+    /// <summary>Demo mode: behave as if the system volume changed.</summary>
+    public void SimulateVolume(float level) => OnVolumeChanged(level, false);
 
     public void NudgeVolume(int wheelDelta) => Volume.Nudge(wheelDelta > 0 ? 0.04f : -0.04f);
 

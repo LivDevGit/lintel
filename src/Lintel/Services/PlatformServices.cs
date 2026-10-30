@@ -196,6 +196,34 @@ public static class FullscreenDetector
     }
 }
 
+internal static class WindowsUnder
+{
+    private static readonly HashSet<string> DesktopClasses = new(StringComparer.OrdinalIgnoreCase) { "Progman", "WorkerW" };
+
+    /// <summary>
+    /// True when the front-most real window overlapping <paramref name="area"/> (screen pixels)
+    /// is an app rather than the desktop. Overlays, tool windows and hidden/cloaked windows don't count.
+    /// </summary>
+    public static bool AppCovers(Win32.RECT area, ICollection<IntPtr> ownWindows)
+    {
+        var found = false;
+        Win32.EnumWindows((hWnd, _) =>
+        {
+            if (ownWindows.Contains(hWnd) || !Win32.IsWindowVisible(hWnd) || Win32.IsIconic(hWnd) || Win32.IsCloaked(hWnd))
+                return true;
+            var ex = Win32.GetWindowLongPtr(hWnd, Win32.GWL_EXSTYLE).ToInt64();
+            if ((ex & (Win32.WS_EX_TOOLWINDOW | Win32.WS_EX_TRANSPARENT)) != 0) return true;
+            if (!Win32.GetWindowRect(hWnd, out var r) || r.Right - r.Left < 2 || r.Bottom - r.Top < 2) return true;
+            if (r.Right <= area.Left || r.Left >= area.Right || r.Bottom <= area.Top || r.Top >= area.Bottom) return true;
+
+            // Windows are enumerated front to back, so the first overlapping one decides.
+            found = !DesktopClasses.Contains(Win32.ClassNameOf(hWnd));
+            return false;
+        }, IntPtr.Zero);
+        return found;
+    }
+}
+
 public static class SystemAccent
 {
     public static System.Windows.Media.Color Get()

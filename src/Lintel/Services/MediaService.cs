@@ -248,6 +248,15 @@ public sealed class MediaService
         }
     }
 
+    /// <summary>Demo mode: show a made-up track instead of a real session.</summary>
+    public void Inject(MediaSnapshot snapshot)
+    {
+        var newTrack = snapshot.Title != Current.Title || snapshot.Artist != Current.Artist;
+        Current = snapshot;
+        Changed?.Invoke();
+        if (newTrack && snapshot.HasSession) TrackChanged?.Invoke();
+    }
+
     public async void PlayPause() { try { if (_session != null) await _session.TryTogglePlayPauseAsync(); } catch (Exception ex) { Log.Error("media.toggle", ex); } }
     public async void Next() { try { if (_session != null) await _session.TrySkipNextAsync(); } catch (Exception ex) { Log.Error("media.next", ex); } }
     public async void Previous() { try { if (_session != null) await _session.TrySkipPreviousAsync(); } catch (Exception ex) { Log.Error("media.prev", ex); } }

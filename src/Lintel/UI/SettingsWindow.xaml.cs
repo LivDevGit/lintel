@@ -25,6 +25,12 @@ public partial class SettingsWindow : Window
 
         DisplayModeBox.ItemsSource = Enum.GetValues<DisplayMode>();
         StyleBox.ItemsSource = Enum.GetValues<IslandStyle>();
+        TopEdgeBox.ItemsSource = new[]
+        {
+            new { Value = TopEdgeMode.Slim, Label = "Slim down (recommended)" },
+            new { Value = TopEdgeMode.Reserve, Label = "Reserve space at the top" },
+            new { Value = TopEdgeMode.Overlay, Label = "Stay on top as usual" },
+        };
         AccentBox.ItemsSource = Enum.GetValues<AccentMode>();
         DisplayBox.ItemsSource = Forms.Screen.AllScreens
             .Select((s, i) => new { Label = IslandManager.Describe(s, i), Device = s.DeviceName })
@@ -49,6 +55,16 @@ public partial class SettingsWindow : Window
     {
         var c = Hub.ParseColor(_settings.CustomAccent);
         Swatch.Background = c != null ? new SolidColorBrush(c.Value) : Brushes.Transparent;
+    }
+
+    private void OnTopEdgeChanged(object sender, SelectionChangedEventArgs e)
+    {
+        TopEdgeHint.Text = _settings.TopEdge switch
+        {
+            TopEdgeMode.Slim => "Over a maximized app it shrinks to a thin bar that clicks pass through, so tabs and search boxes stay usable. Rest the pointer at the very top to open it.",
+            TopEdgeMode.Reserve => "Keeps a strip at the top of the display free, like a taskbar does, so maximized apps start below the island. Costs a little screen height.",
+            _ => "The pill always floats over whatever is underneath, including browser tabs and title bars.",
+        };
     }
 
     private void OnNavChanged(object sender, SelectionChangedEventArgs e)

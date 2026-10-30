@@ -106,11 +106,40 @@ public sealed class SpectrumService : IDisposable
     private DateTime _lastPublish;
 
     public float[] Levels { get; } = new float[Bands];
-    public bool Running => _capture != null;
+    public bool Running => _capture != null || _simulation != null;
     public event Action? Updated;
+
+    /// <summary>Demo mode: animate plausible bars instead of capturing real audio.</summary>
+    public bool Simulated { get; set; }
+    private System.Windows.Threading.DispatcherTimer? _simulation;
+    private readonly Random _random = new(7);
+    private double _phase;
+
+    private void StartSimulation()
+    {
+        _simulation = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(42) };
+        _simulation.Tick += (_, _) =>
+        {
+            _phase += 0.042;
+            var beat = Math.Pow(Math.Max(0, Math.Sin(_phase * Math.PI * 2 * 2.0)), 6); // ~120 bpm pulse
+            for (var b = 0; b < Bands; b++)
+            {
+                var body = 0.35 + 0.25 * Math.Sin(_phase * (2.1 + b * 0.9) + b);
+                var target = Math.Clamp(body + beat * (0.55 - b * 0.06) + (_random.NextDouble() - 0.5) * 0.18, 0.08, 1);
+                Levels[b] = (float)(Levels[b] * 0.45 + target * 0.55);
+            }
+            Updated?.Invoke();
+        };
+        _simulation.Start();
+    }
 
     public void Start()
     {
+        if (Simulated)
+        {
+            if (_simulation == null) StartSimulation();
+            return;
+        }
         if (_capture != null) return;
         try
         {
@@ -129,6 +158,13 @@ public sealed class SpectrumService : IDisposable
 
     public void Stop()
     {
+        if (_simulation != null)
+        {
+            _simulation.Stop();
+            _simulation = null;
+            Array.Clear(Levels);
+            Updated?.Invoke();
+        }
         if (_capture == null) return;
         try
         {

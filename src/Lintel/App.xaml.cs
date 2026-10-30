@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
 using Lintel.Core;
@@ -28,6 +29,13 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        var demoIndex = Array.IndexOf(e.Args, "--demo");
+        if (demoIndex >= 0 && demoIndex + 1 < e.Args.Length)
+        {
+            await RunDemoAsync(e.Args[demoIndex + 1]);
+            return;
+        }
+
         _singleInstance = new Mutex(true, @"Local\Lintel.SingleInstance", out var first);
         if (!first)
         {
@@ -42,6 +50,8 @@ public partial class App : Application
             System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
 
         DispatcherUnhandledException += OnUnhandled;
+        // Release any reserved top strip (app bar) when Windows signs out or shuts down.
+        SessionEnding += (_, _) => Quit();
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
             Log.Write($"[fatal] {args.ExceptionObject}");
 
@@ -78,6 +88,39 @@ public partial class App : Application
     }
 
     private readonly DispatcherTimer _trim = new() { Interval = TimeSpan.FromSeconds(15) };
+    private bool _demo;
+
+    /// <summary>Records the README demos with in-memory settings: no tray, hotkey or saved state.</summary>
+    private async Task RunDemoAsync(string output)
+    {
+        _demo = true;
+        DispatcherUnhandledException += OnUnhandled;
+        _settings = new AppSettings
+        {
+            TopEdge = TopEdgeMode.Overlay,
+            HideInFullscreen = false,
+            PixelShift = false,
+            HideWhenIdle = false,
+            RememberLastTab = false,
+            AccentMode = AccentMode.AlbumArt,
+            CalendarFeeds = new System.Collections.ObjectModel.ObservableCollection<string> { "demo" },
+        };
+        _hub = new Hub(_settings);
+        await _hub.StartAsync(demo: true);
+
+        IslandWindow.DemoMode = true;
+        _islands = new IslandManager(_hub);
+        _islands.Rebuild();
+        try
+        {
+            await new DemoDirector(_hub, _islands.Windows[0], output).RunAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"[demo] failed: {ex}");
+        }
+        Quit();
+    }
 
     public IEnumerable<IntPtr> IslandHandles() => _islands?.Handles ?? Enumerable.Empty<IntPtr>();
 
@@ -112,7 +155,7 @@ public partial class App : Application
 
     public void Quit()
     {
-        SettingsStore.Save(_settings);
+        if (!_demo) SettingsStore.Save(_settings);
         _settingsWindow?.Close();
         _islands?.Dispose();
         _tray?.Dispose();

@@ -203,6 +203,14 @@ public sealed class BatteryService : IDisposable
         }
     }
 
+    /// <summary>Demo mode: pretend the power state changed.</summary>
+    public void Inject(BatterySnapshot next)
+    {
+        var previous = Current;
+        Current = next;
+        Changed?.Invoke(previous, next);
+    }
+
     public void Dispose()
     {
         _timer.Stop();

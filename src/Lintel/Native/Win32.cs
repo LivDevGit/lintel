@@ -13,6 +13,7 @@ internal static class Win32
     public struct RECT { public int Left, Top, Right, Bottom; }
 
     public const int GWL_EXSTYLE = -20;
+    public const long WS_EX_TRANSPARENT = 0x00000020;
     public const long WS_EX_TOOLWINDOW = 0x00000080;
     public const long WS_EX_NOACTIVATE = 0x08000000;
 
@@ -47,6 +48,49 @@ internal static class Win32
 
     [DllImport("user32.dll")]
     public static extern bool IsZoomed(IntPtr hWnd);
+
+    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    public static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    public static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern bool IsIconic(IntPtr hWnd);
+
+    private const int DWMWA_CLOAKED = 14;
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmGetWindowAttribute(IntPtr hWnd, int attribute, out int value, int size);
+
+    /// <summary>Cloaked windows are "visible" but not shown: other virtual desktops, suspended UWP apps.</summary>
+    public static bool IsCloaked(IntPtr hWnd) =>
+        DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out var cloaked, sizeof(int)) == 0 && cloaked != 0;
+
+    // ---- App bars (reserving a screen edge, like the taskbar does)
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct APPBARDATA
+    {
+        public uint cbSize;
+        public IntPtr hWnd;
+        public uint uCallbackMessage;
+        public uint uEdge;
+        public RECT rc;
+        public IntPtr lParam;
+    }
+
+    public const uint ABM_NEW = 0, ABM_REMOVE = 1, ABM_QUERYPOS = 2, ABM_SETPOS = 3;
+    public const uint ABE_TOP = 1;
+    public const int ABN_POSCHANGED = 1;
+
+    [DllImport("shell32.dll")]
+    public static extern IntPtr SHAppBarMessage(uint message, ref APPBARDATA data);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern uint RegisterWindowMessage(string name);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern int GetClassName(IntPtr hWnd, StringBuilder name, int max);

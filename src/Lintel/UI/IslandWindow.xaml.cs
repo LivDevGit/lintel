@@ -25,13 +25,19 @@ public partial class IslandWindow : Window
     private const double FloatingOffset = 8;
     private const double FullWindowWidth = 660;
     private const double FullWindowHeight = 320;
+    private const double SlimWidth = 110;
+    private const double SlimHeight = 5;
+    // Reserve mode keeps the strip shorter than a standard title bar (32px).
+    private const double ReservedTop = 1;
+    private const double ReservedPillHeight = 22;
+    private const double ReservedGap = 1;
 
     private readonly Hub _hub;
     private readonly AppSettings _settings;
     private readonly DispatcherTimer _tick = new(DispatcherPriority.Input) { Interval = TimeSpan.FromMilliseconds(40) };
     private readonly DispatcherTimer _peekTimer = new();
 
-    private readonly Spring _width, _height, _radius, _collapsedFade, _peekFade, _expandedFade, _shadow, _presence;
+    private readonly Spring _width, _height, _radius, _topRadius, _top, _collapsedFade, _peekFade, _expandedFade, _shadow, _presence;
     private readonly Spring[] _springs;
     private bool _animating;
 
@@ -41,6 +47,12 @@ public partial class IslandWindow : Window
 
     /// <summary>How often pixel shift moves the island. <c>--drift-demo</c> shortens it to show the effect.</summary>
     public static TimeSpan DriftInterval { get; set; } = TimeSpan.FromMinutes(2.5);
+
+    /// <summary>Recording demos: the window keeps a fixed size so every frame lines up.</summary>
+    public static bool DemoMode { get; set; }
+
+    /// <summary>Everything the window draws, for recording demo frames.</summary>
+    public FrameworkElement Surface => Root;
     private readonly Random _random = new();
     private DateTime _lastActivity = DateTime.Now;
     private TimeSpan _lastFrame;
@@ -49,6 +61,12 @@ public partial class IslandWindow : Window
     private int _tickCount;
     private Size _windowSize = new(FullWindowWidth, FullWindowHeight);
     private bool _hiddenForFullscreen;
+
+    // Top-edge behaviour: slim over apps, or a reserved strip (app bar).
+    private bool _slim;
+    private bool _clickThrough;
+    private bool _appBarRegistered;
+    private uint _appBarMessage;
 
     private DateTime? _hoverStart;
     private DateTime? _leaveStart;
@@ -77,6 +95,8 @@ public partial class IslandWindow : Window
         _width = new Spring(_settings.CollapsedWidth, 380, 30);
         _height = new Spring(ch, 380, 30);
         _radius = new Spring(ch / 2, 380, 34);
+        _topRadius = new Spring(ch / 2, 380, 34);
+        _top = new Spring(TargetTop, 380, 34);
         _collapsedFade = new Spring(1, 500, 45);
         _peekFade = new Spring(0, 500, 45);
         // Quick fade: a part-transparent layer has to be drawn off-screen first on every frame,
@@ -84,7 +104,7 @@ public partial class IslandWindow : Window
         _expandedFade = new Spring(0, 700, 53);
         _shadow = new Spring(0, 300, 35);
         _presence = new Spring(1, 120, 22);
-        _springs = new[] { _width, _height, _radius, _collapsedFade, _peekFade, _expandedFade, _shadow, _presence };
+        _springs = new[] { _width, _height, _radius, _topRadius, _top, _collapsedFade, _peekFade, _expandedFade, _shadow, _presence };
 
         Root.RenderTransform = _drift;
         ExpandedLayer.RenderTransform = _expandedShift;
@@ -129,7 +149,117 @@ public partial class IslandWindow : Window
         Win32.SetWindowLongPtr(_hwnd, Win32.GWL_EXSTYLE, new IntPtr(ex));
         ApplyCaptureAffinity();
         PlaceOn(Screen);
+        _appBarMessage = Win32.RegisterWindowMessage("Lintel.AppBar");
+        HwndSource.FromHwnd(_hwnd)?.AddHook(AppBarHook);
+        UpdateAppBar();
         _tick.Start();
+    }
+
+    // ================================================================ reserved strip (app bar)
+
+    /// <summary>
+    /// In Reserve mode the island registers as a top app bar, the same mechanism a top-docked
+    /// taskbar uses, so maximized windows are laid out below it instead of under it.
+    /// </summary>
+    private void UpdateAppBar()
+    {
+        if (_hwnd == IntPtr.Zero) return;
+        var want = _settings.TopEdge == TopEdgeMode.Reserve;
+        if (!want)
+        {
+            RemoveAppBar();
+            return;
+        }
+
+        var data = NewAppBarData();
+        if (!_appBarRegistered)
+        {
+            if (Win32.SHAppBarMessage(Win32.ABM_NEW, ref data) == IntPtr.Zero)
+            {
+                Log.Write("[appbar] registration failed");
+                return;
+            }
+            _appBarRegistered = true;
+        }
+        SetAppBarPosition();
+    }
+
+    private Win32.APPBARDATA NewAppBarData() => new()
+    {
+        cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<Win32.APPBARDATA>(),
+        hWnd = _hwnd,
+        uCallbackMessage = _appBarMessage,
+        uEdge = Win32.ABE_TOP,
+    };
+
+    private void SetAppBarPosition()
+    {
+        if (!_appBarRegistered) return;
+        var b = Screen.Bounds;
+        var scale = Win32.ScaleForPoint(b.Left + b.Width / 2, b.Top + b.Height / 2);
+        var height = (int)Math.Ceiling((ReservedTop + ReservedPillHeight + ReservedGap) * scale);
+
+        var data = NewAppBarData();
+        data.rc = new Win32.RECT { Left = b.Left, Top = b.Top, Right = b.Right, Bottom = b.Top + height };
+        Win32.SHAppBarMessage(Win32.ABM_QUERYPOS, ref data);
+        data.rc.Bottom = data.rc.Top + height;
+        Win32.SHAppBarMessage(Win32.ABM_SETPOS, ref data);
+    }
+
+    private void RemoveAppBar()
+    {
+        if (!_appBarRegistered) return;
+        var data = NewAppBarData();
+        Win32.SHAppBarMessage(Win32.ABM_REMOVE, ref data);
+        _appBarRegistered = false;
+    }
+
+    private IntPtr AppBarHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (_appBarMessage != 0 && msg == (int)_appBarMessage && wParam.ToInt32() == Win32.ABN_POSCHANGED)
+        {
+            // Another bar or the taskbar moved; claim our strip again.
+            SetAppBarPosition();
+            handled = true;
+        }
+        return IntPtr.Zero;
+    }
+
+    // ================================================================ slim over apps
+
+    /// <summary>The screen-pixel area the resting pill occupies, used to see what's underneath.</summary>
+    private Win32.RECT PillAreaOnScreen()
+    {
+        var b = Screen.Bounds;
+        var scale = Win32.ScaleForPoint(b.Left + b.Width / 2, b.Top + b.Height / 2);
+        var halfWidth = (int)Math.Ceiling((CollapsedTargetWidth / 2 + 10) * scale);
+        var center = b.Left + b.Width / 2;
+        return new Win32.RECT
+        {
+            Left = center - halfWidth,
+            Right = center + halfWidth,
+            Top = b.Top,
+            Bottom = b.Top + (int)Math.Ceiling((FloatingOffset + RestingHeight) * scale),
+        };
+    }
+
+    private void CheckSlim()
+    {
+        var slim = _settings.TopEdge == TopEdgeMode.Slim &&
+                   WindowsUnder.AppCovers(PillAreaOnScreen(), App.Current.IslandHandles().ToHashSet());
+        if (slim == _slim) return;
+        _slim = slim;
+        if (State == IslandState.Collapsed) UpdateTargets();
+    }
+
+    /// <summary>Lets clicks fall through to the tabs or search box underneath while slim.</summary>
+    private void SetClickThrough(bool on)
+    {
+        if (on == _clickThrough || _hwnd == IntPtr.Zero) return;
+        _clickThrough = on;
+        var ex = Win32.GetWindowLongPtr(_hwnd, Win32.GWL_EXSTYLE).ToInt64();
+        ex = on ? ex | Win32.WS_EX_TRANSPARENT : ex & ~Win32.WS_EX_TRANSPARENT;
+        Win32.SetWindowLongPtr(_hwnd, Win32.GWL_EXSTYLE, new IntPtr(ex));
     }
 
     public void PlaceOn(Forms.Screen screen)
@@ -152,9 +282,10 @@ public partial class IslandWindow : Window
     /// </summary>
     private void FitWindow(bool full)
     {
+        if (DemoMode) full = true;
         var size = full
             ? new Size(FullWindowWidth, FullWindowHeight)
-            : new Size(Math.Min(FullWindowWidth, CollapsedTargetWidth + 48), Math.Min(FullWindowHeight, TopOffset + _settings.CollapsedHeight + 16));
+            : new Size(Math.Min(FullWindowWidth, CollapsedTargetWidth + 48), Math.Min(FullWindowHeight, FloatingOffset + RestingHeight + 16));
         if (Math.Abs(size.Width - _windowSize.Width) < 0.5 && Math.Abs(size.Height - _windowSize.Height) < 0.5) return;
         _windowSize = size;
         PlaceOn(Screen);
@@ -178,6 +309,7 @@ public partial class IslandWindow : Window
         _peekTimer.Stop();
         _driftTimer.Stop();
         StopAnimating();
+        RemoveAppBar();
         _hub.PeekRequested -= OnPeekRequested;
         _hub.PropertyChanged -= OnHubChanged;
         _settings.PropertyChanged -= OnSettingsChanged;
@@ -185,7 +317,18 @@ public partial class IslandWindow : Window
 
     // ================================================================ state machine
 
-    private double TopOffset => _settings.Style == IslandStyle.Floating ? FloatingOffset : 0;
+    /// <summary>Gap between the screen edge and the island for the current state.</summary>
+    private double TargetTop =>
+        _settings.Style == IslandStyle.Attached || (_slim && State == IslandState.Collapsed) ? 0
+        : IsReserveResting ? ReservedTop
+        : FloatingOffset;
+
+    private bool IsReserveResting => _settings.TopEdge == TopEdgeMode.Reserve && State != IslandState.Expanded;
+
+    /// <summary>Height of the resting pill: compact while it lives in the reserved strip.</summary>
+    private double RestingHeight => _settings.TopEdge == TopEdgeMode.Reserve ? ReservedPillHeight : _settings.CollapsedHeight;
+
+    private bool IsSlimNow => _slim && State == IslandState.Collapsed;
 
     private double CollapsedTargetWidth =>
         _settings.CollapsedWidth + (_hub.MediaActive ? 120 : 0);
@@ -264,9 +407,19 @@ public partial class IslandWindow : Window
     /// <summary>Sets spring targets for the current state; the render loop does the rest.</summary>
     private void UpdateTargets()
     {
-        var ch = _settings.CollapsedHeight;
+        var ch = RestingHeight;
         switch (State)
         {
+            case IslandState.Collapsed when _slim:
+                // A thin handle hugging the top edge: visible, but out of the way of tabs.
+                _width.Target = SlimWidth;
+                _height.Target = SlimHeight;
+                _radius.Target = SlimHeight / 2;
+                _collapsedFade.Target = 0;
+                _peekFade.Target = 0;
+                _expandedFade.Target = 0;
+                _shadow.Target = 0;
+                break;
             case IslandState.Collapsed:
                 _width.Target = CollapsedTargetWidth;
                 _height.Target = ch;
@@ -296,9 +449,13 @@ public partial class IslandWindow : Window
                 break;
         }
 
+        _top.Target = TargetTop;
+        _topRadius.Target = _settings.Style == IslandStyle.Attached || IsSlimNow ? 0 : _radius.Target;
+
         CollapsedLayer.IsHitTestVisible = State != IslandState.Expanded;
         PeekLayer.IsHitTestVisible = false;
         ExpandedLayer.IsHitTestVisible = State == IslandState.Expanded;
+        SetClickThrough(IsSlimNow);
         FitWindow(full: true);
         StartAnimating();
     }
@@ -366,13 +523,13 @@ public partial class IslandWindow : Window
     private void ApplyFrame()
     {
         var w = Math.Max(20, _width.Value);
-        var h = Math.Max(10, _height.Value);
+        var h = Math.Max(2, _height.Value);
         var r = Math.Max(0, _radius.Value);
-        var top = _settings.Style == IslandStyle.Attached ? 0 : r;
+        var top = Math.Max(0, Math.Min(_topRadius.Value, r));
 
         Island.Width = w;
         Island.Height = h;
-        Island.Margin = new Thickness(0, TopOffset, 0, 0);
+        Island.Margin = new Thickness(0, Math.Max(0, _top.Value), 0, 0);
         Island.CornerRadius = new CornerRadius(top, top, r, r);
         Island.Clip = IslandShape.Build(w, h, top, r);
 
@@ -409,13 +566,17 @@ public partial class IslandWindow : Window
     {
         var w = _width.Value;
         var left = (Root.ActualWidth - w) / 2;
-        return new Rect(left, TopOffset, w, _height.Value);
+        return new Rect(left, Math.Max(0, _top.Value), w, _height.Value);
     }
 
     private void OnTick(object? sender, EventArgs e)
     {
         _tickCount++;
-        if (_tickCount % 12 == 0) CheckFullscreen();
+        if (_tickCount % 12 == 0)
+        {
+            CheckFullscreen();
+            CheckSlim();
+        }
         if (_tickCount % 50 == 0) KeepOnTop();
         if (_hiddenForFullscreen || PresentationSource.FromVisual(Root) == null) return;
 
@@ -429,7 +590,10 @@ public partial class IslandWindow : Window
         var now = DateTime.Now;
         var island = IslandRect();
         // Hot zone: the pill, a little padding, and everything up to the screen edge above it.
-        var hot = new Rect(island.Left - 10, -2, island.Width + 20, island.Bottom + 8);
+        // While slim it's only the top few pixels, so reaching for a tab doesn't open the island.
+        var hot = IsSlimNow
+            ? new Rect(island.Left - 24, -2, island.Width + 48, 6)
+            : new Rect(island.Left - 10, -2, island.Width + 20, island.Bottom + 8);
         UpdatePresence(now, hot.Contains(p));
 
         // Poll quickly only while the pointer is anywhere near; otherwise a few times a second is plenty.
@@ -709,6 +873,13 @@ public partial class IslandWindow : Window
             case nameof(AppSettings.ShowShadow):
                 ApplyLayoutSettings();
                 UpdateTargets();
+                SetAppBarPosition();
+                break;
+            case nameof(AppSettings.TopEdge):
+                ApplyLayoutSettings();
+                UpdateAppBar();
+                CheckSlim();
+                UpdateTargets();
                 break;
             case nameof(AppSettings.ShelfEnabled):
                 SelectTab(_settings.LastTab);
@@ -727,9 +898,12 @@ public partial class IslandWindow : Window
 
     private void ApplyLayoutSettings()
     {
-        var ch = _settings.CollapsedHeight;
+        var ch = RestingHeight;
         CollapsedLayer.Height = ch;
         PeekSpacer.Height = new GridLength(ch);
-        PillTitle.FontSize = ch >= 34 ? 13 : 12.5;
+        PillTitle.FontSize = ch >= 34 ? 13 : ch < 26 ? 11.5 : 12.5;
+        PillArt.Width = PillArt.Height = ch < 26 ? 16 : 20;
+        PillArt.CornerRadius = new CornerRadius(ch < 26 ? 5 : 6);
+        PillBars.Height = ch < 26 ? 12 : 16;
     }
 }

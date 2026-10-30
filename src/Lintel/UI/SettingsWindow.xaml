@@ -265,6 +265,15 @@
                             </DockPanel>
                             <Border Style="{StaticResource Divider}" />
                             <DockPanel Style="{StaticResource Row}">
+                                <ComboBox x:Name="TopEdgeBox" Style="{StaticResource RightCombo}" DisplayMemberPath="Label" SelectedValuePath="Value"
+                                          SelectedValue="{Binding TopEdge}" SelectionChanged="OnTopEdgeChanged" />
+                                <StackPanel>
+                                    <TextBlock Text="When an app is under the island" Style="{StaticResource Label}" />
+                                    <TextBlock x:Name="TopEdgeHint" Style="{StaticResource Hint}" />
+                                </StackPanel>
+                            </DockPanel>
+                            <Border Style="{StaticResource Divider}" />
+                            <DockPanel Style="{StaticResource Row}">
                                 <TextBlock Style="{StaticResource Value}" Text="{Binding CollapsedWidth, StringFormat={}{0:0} px}" />
                                 <Slider Style="{StaticResource RightSlider}" Minimum="140" Maximum="320" TickFrequency="10" Value="{Binding CollapsedWidth}" />
                                 <TextBlock Text="Resting width" Style="{StaticResource Label}" VerticalAlignment="Center" />
