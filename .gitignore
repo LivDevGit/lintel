@@ -1,0 +1,10 @@
+# Build output
+bin/
+obj/
+publish/
+*.user
+.vs/
+
+# Third-party reference material: never commit these
+*.dmg
+*.zip

@@ -1,0 +1,474 @@
+<Window x:Class="Lintel.UI.IslandWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:Lintel.UI"
+        Title="Lintel"
+        Width="660" Height="320"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ShowInTaskbar="False" ResizeMode="NoResize" Topmost="True" ShowActivated="False"
+        FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="13" Foreground="#F2F2F5"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Ideal" TextOptions.TextRenderingMode="Grayscale">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="Vis" />
+        <ui:InverseVisibilityConverter x:Key="NotVis" />
+        <FontFamily x:Key="Icons">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+
+        <Style x:Key="Glyph" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource Icons}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="Muted" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#A6A6B0" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+
+        <Style x:Key="IconButton" TargetType="Button">
+            <Setter Property="Foreground" Value="#F2F2F5" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Width" Value="32" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="999">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="#1FFFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="#38FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.35" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PillButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
+            <Setter Property="Width" Value="NaN" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="Padding" Value="10,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bg" Background="#17FFFFFF" CornerRadius="13" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="#2BFFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="TabButton" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="#A6A6B0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Bg" Background="Transparent" CornerRadius="14" Padding="12,0" Height="28">
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="#14FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="#24FFFFFF" />
+                                <Setter Property="Foreground" Value="#F2F2F5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ContextMenu">
+            <Setter Property="Background" Value="#FF1C1C21" />
+            <Setter Property="Foreground" Value="#F2F2F5" />
+            <Setter Property="BorderBrush" Value="#33FFFFFF" />
+        </Style>
+        <Style TargetType="MenuItem">
+            <Setter Property="Foreground" Value="#F2F2F5" />
+        </Style>
+    </Window.Resources>
+
+    <Grid x:Name="Root">
+        <!-- Shadow lives on its own plate so the island content isn't re-rendered through an effect. -->
+        <Border x:Name="ShadowPlate" HorizontalAlignment="Center" VerticalAlignment="Top"
+                Background="Black" Opacity="0" IsHitTestVisible="False">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="30" ShadowDepth="8" Direction="270" Opacity="0.6" Color="Black" />
+            </Border.Effect>
+        </Border>
+
+        <Border x:Name="Island" HorizontalAlignment="Center" VerticalAlignment="Top"
+                BorderBrush="#26FFFFFF" BorderThickness="1" AllowDrop="True">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#FF101014" Offset="0" />
+                    <GradientStop Color="#FF060608" Offset="1" />
+                </LinearGradientBrush>
+            </Border.Background>
+
+            <Grid>
+                <!-- ============ Collapsed pill ============ -->
+                <!-- Margin top -1 cancels the island's 1px border so the row centres on the pill itself.
+                     The title spans the full width with equal side gutters, so it centres on the pill
+                     rather than on whatever space the side icons leave over. -->
+                <Grid x:Name="CollapsedLayer" VerticalAlignment="Top" Margin="0,-1,0,0">
+                    <Border Width="20" Height="20" CornerRadius="6" Margin="11,0,0,0"
+                            HorizontalAlignment="Left" VerticalAlignment="Center"
+                            Visibility="{Binding PillShowsArt, Converter={StaticResource Vis}}">
+                        <Border.Background>
+                            <ImageBrush ImageSource="{Binding Art}" Stretch="UniformToFill" />
+                        </Border.Background>
+                    </Border>
+
+                    <!-- Digits and capitals sit above the baseline, so a box-centred line reads ~1px low. -->
+                    <ui:MarqueeText x:Name="PillTitle" Text="{Binding PillText}" VerticalAlignment="Center"
+                                    FontSize="12.5" FontWeight="SemiBold" Margin="42,0">
+                        <ui:MarqueeText.RenderTransform>
+                            <TranslateTransform Y="-1" />
+                        </ui:MarqueeText.RenderTransform>
+                    </ui:MarqueeText>
+
+                    <Grid Width="26" Margin="0,0,9,0" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <ui:SpectrumBars Width="26" Height="16" Fill="{Binding AccentBrush}"
+                                         Visibility="{Binding PillShowsBars, Converter={StaticResource Vis}}" />
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE769;" FontSize="12" Foreground="#A6A6B0"
+                                   Visibility="{Binding PillShowsPaused, Converter={StaticResource Vis}}" />
+                        <TextBlock x:Name="DownloadGlyph" Style="{StaticResource Glyph}" Text="&#xE896;" FontSize="13"
+                                   Foreground="{Binding AccentBrush}"
+                                   Visibility="{Binding PillShowsDownload, Converter={StaticResource Vis}}" />
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE945;" FontSize="13" Foreground="#6BE38C"
+                                   Visibility="{Binding PillShowsCharging, Converter={StaticResource Vis}}" />
+                    </Grid>
+                </Grid>
+
+                <!-- ============ Peek (short notifications under the pill) ============ -->
+                <Grid x:Name="PeekLayer" VerticalAlignment="Top" Margin="0,-1,0,0" Opacity="0" IsHitTestVisible="False">
+                    <Grid.RowDefinitions>
+                        <RowDefinition x:Name="PeekSpacer" Height="32" />
+                        <RowDefinition Height="46" />
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="1" Margin="16,0,16,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid Width="32" Height="32" VerticalAlignment="Center">
+                            <Border x:Name="PeekArt" CornerRadius="8" Visibility="Collapsed">
+                                <Border.Background>
+                                    <ImageBrush x:Name="PeekArtBrush" Stretch="UniformToFill" />
+                                </Border.Background>
+                            </Border>
+                            <TextBlock x:Name="PeekGlyph" Style="{StaticResource Glyph}" FontSize="18"
+                                       Foreground="{Binding AccentBrush}" />
+                        </Grid>
+                        <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center">
+                            <TextBlock x:Name="PeekTitle" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="PeekSubtitle" Style="{StaticResource Muted}" FontSize="12" />
+                        </StackPanel>
+                        <Grid x:Name="PeekMeter" Grid.Column="2" Width="120" Height="6" VerticalAlignment="Center">
+                            <Border Background="#26FFFFFF" CornerRadius="3" />
+                            <Border x:Name="PeekMeterFill" Background="{Binding AccentBrush}" CornerRadius="3"
+                                    HorizontalAlignment="Left" Width="0" />
+                        </Grid>
+                    </Grid>
+                </Grid>
+
+                <!-- ============ Expanded ============ -->
+                <Grid x:Name="ExpandedLayer" Width="580" Height="240" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,-1,0,0"
+                      Opacity="0" IsHitTestVisible="False">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="44" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- header -->
+                    <Grid Margin="14,10,12,0">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="HomeTab" Style="{StaticResource TabButton}" GroupName="tabs" Checked="OnTabChecked">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE80F;" FontSize="13" />
+                                    <TextBlock Text="Now" Margin="7,0,0,0" />
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="ShelfTab" Style="{StaticResource TabButton}" GroupName="tabs" Margin="4,0,0,0" Checked="OnTabChecked">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE7B8;" FontSize="13" />
+                                    <TextBlock Text="Shelf" Margin="7,0,0,0" />
+                                    <Border Background="#33FFFFFF" CornerRadius="7" Padding="5,0" Margin="6,0,0,0" MinWidth="14"
+                                            Visibility="{Binding HasShelfItems, Converter={StaticResource Vis}}">
+                                        <TextBlock Text="{Binding Shelf.Items.Count}" FontSize="10.5" HorizontalAlignment="Center" />
+                                    </Border>
+                                </StackPanel>
+                            </RadioButton>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <TextBlock Text="{Binding DownloadsText}" Style="{StaticResource Muted}" FontSize="12"
+                                       VerticalAlignment="Center" Margin="0,0,12,0" />
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0"
+                                        Visibility="{Binding ShowBatteryBadge, Converter={StaticResource Vis}}">
+                                <TextBlock Text="{Binding BatteryText}" FontSize="12" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                <!-- drawn battery: body, fill scaled by level, nub -->
+                                <Grid Width="26" Height="12" VerticalAlignment="Center">
+                                    <Border BorderBrush="#8CFFFFFF" BorderThickness="1" CornerRadius="3.5" Margin="0,0,3,0" />
+                                    <Border Margin="2,2,5,2" CornerRadius="1.5" Background="{Binding BatteryFill}" RenderTransformOrigin="0,0.5">
+                                        <Border.RenderTransform>
+                                            <ScaleTransform ScaleX="{Binding BatteryLevel}" />
+                                        </Border.RenderTransform>
+                                    </Border>
+                                    <Border Width="2" Height="5" HorizontalAlignment="Right" Background="#8CFFFFFF" CornerRadius="0,1,1,0" />
+                                </Grid>
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE945;" FontSize="11" Foreground="#6BE38C" Margin="3,0,0,0"
+                                           Visibility="{Binding IsCharging, Converter={StaticResource Vis}}" />
+                            </StackPanel>
+                            <Button Style="{StaticResource IconButton}" Width="30" Height="30" Click="OnSettingsClick" ToolTip="Settings">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE713;" FontSize="14" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- ===== Now (home) ===== -->
+                    <Grid x:Name="HomeView" Grid.Row="1" Margin="14,6,14,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="196" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border x:Name="MediaCard" CornerRadius="18" Background="{Binding AccentWashBrush}" Padding="10"
+                                PreviewMouseWheel="OnMediaWheel">
+                            <Grid>
+                                <!-- playing -->
+                                <Grid Visibility="{Binding HasMedia, Converter={StaticResource Vis}}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Width="118" Height="118" CornerRadius="14" Background="#1AFFFFFF" VerticalAlignment="Center">
+                                        <Grid>
+                                            <TextBlock Style="{StaticResource Glyph}" Text="&#xEC4F;" FontSize="34" Foreground="#55FFFFFF" />
+                                            <Border CornerRadius="14">
+                                                <Border.Background>
+                                                    <ImageBrush ImageSource="{Binding Art}" Stretch="UniformToFill" />
+                                                </Border.Background>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+
+                                    <Grid Grid.Column="1" Margin="14,0,4,0">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="{Binding SourceApp}" FontSize="11" Foreground="{Binding AccentBrush}" FontWeight="SemiBold" />
+                                        <StackPanel Grid.Row="1" Margin="0,2,0,0">
+                                            <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Artist}" Style="{StaticResource Muted}" Margin="0,1,0,0" />
+                                        </StackPanel>
+
+                                        <!-- progress -->
+                                        <Grid Grid.Row="3" Margin="0,6,0,0">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="12" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <Grid x:Name="SeekBar" Background="Transparent" Cursor="Hand" MouseLeftButtonUp="OnSeek"
+                                                  IsEnabled="{Binding CanSeek}">
+                                                <Border Height="4" CornerRadius="2" Background="#2EFFFFFF" VerticalAlignment="Center" />
+                                                <Border Height="4" CornerRadius="2" Background="{Binding AccentBrush}" VerticalAlignment="Center"
+                                                        RenderTransformOrigin="0,0.5">
+                                                    <Border.RenderTransform>
+                                                        <ScaleTransform ScaleX="{Binding Progress}" />
+                                                    </Border.RenderTransform>
+                                                </Border>
+                                            </Grid>
+                                            <Grid Grid.Row="1">
+                                                <TextBlock Text="{Binding ElapsedText}" Style="{StaticResource Muted}" FontSize="10.5" />
+                                                <TextBlock Text="{Binding RemainingText}" Style="{StaticResource Muted}" FontSize="10.5" HorizontalAlignment="Right" />
+                                            </Grid>
+                                        </Grid>
+
+                                        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,2,0,0">
+                                            <Button Style="{StaticResource IconButton}" Width="36" Height="36" Click="OnPrevious">
+                                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE892;" FontSize="15" />
+                                            </Button>
+                                            <Button Style="{StaticResource IconButton}" Width="42" Height="42" Margin="10,0" Click="OnPlayPause"
+                                                    Background="#1AFFFFFF">
+                                                <TextBlock Style="{StaticResource Glyph}" Text="{Binding PlayGlyph}" FontSize="18" />
+                                            </Button>
+                                            <Button Style="{StaticResource IconButton}" Width="36" Height="36" Click="OnNext">
+                                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE893;" FontSize="15" />
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </Grid>
+
+                                <!-- idle -->
+                                <Grid x:Name="IdlePanel" Visibility="{Binding HasMedia, Converter={StaticResource NotVis}}">
+                                    <StackPanel VerticalAlignment="Center" Margin="12,0">
+                                        <TextBlock Text="{Binding ClockText}" FontSize="44" FontWeight="Light" FontFamily="Segoe UI Variable Display, Segoe UI" />
+                                        <TextBlock Text="{Binding DateText}" Style="{StaticResource Muted}" FontSize="14" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,14,0,0" Opacity="0.7">
+                                            <TextBlock Style="{StaticResource Glyph}" Text="&#xEC4F;" FontSize="12" />
+                                            <TextBlock Text="Play something and it shows up here." FontSize="12" Margin="8,0,0,0" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Column="1" Width="1" Background="#17FFFFFF" Margin="12,8"
+                                Visibility="{Binding ShowCalendar, Converter={StaticResource Vis}}" />
+
+                        <Grid Grid.Column="2" Visibility="{Binding ShowCalendar, Converter={StaticResource Vis}}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <StackPanel Orientation="Horizontal" Margin="2,2,0,6">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE787;" FontSize="12" Foreground="{Binding AccentBrush}" />
+                                <TextBlock Text="Today" FontWeight="SemiBold" Margin="7,0,0,0" />
+                            </StackPanel>
+                            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
+                                <StackPanel>
+                                    <ItemsControl ItemsSource="{Binding Events}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,0,0,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="3" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Background="{Binding Marker}" CornerRadius="1.5" />
+                                                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                        <TextBlock Text="{Binding Title}" FontSize="12.5" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource Muted}" FontSize="11" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Text="{Binding CalendarHint}" Style="{StaticResource Muted}" FontSize="11.5" TextWrapping="Wrap"
+                                               TextTrimming="None" Margin="2,2,0,0" />
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Grid>
+                    </Grid>
+
+                    <!-- ===== Shelf ===== -->
+                    <Grid x:Name="ShelfView" Grid.Row="1" Margin="14,6,14,14" Visibility="Collapsed">
+                        <Border x:Name="DropZone" CornerRadius="18" BorderThickness="1.5" BorderBrush="#40FFFFFF"
+                                Background="#0AFFFFFF">
+                            <Grid>
+                                <StackPanel x:Name="EmptyShelf" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                            Visibility="{Binding HasShelfItems, Converter={StaticResource NotVis}}">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE896;" FontSize="26" Foreground="{Binding AccentBrush}" />
+                                    <TextBlock Text="Drop files, images or links here" FontWeight="SemiBold" Margin="0,10,0,2" HorizontalAlignment="Center" />
+                                    <TextBlock Text="They stay parked until you drag them out." Style="{StaticResource Muted}" FontSize="12" HorizontalAlignment="Center" />
+                                </StackPanel>
+
+                                <Grid x:Name="ShelfContent" Margin="8"
+                                      Visibility="{Binding HasShelfItems, Converter={StaticResource Vis}}">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <ListBox x:Name="ShelfList" ItemsSource="{Binding Shelf.Items}" Background="Transparent" BorderThickness="0"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Hidden" ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                             PreviewMouseWheel="OnShelfWheel" Focusable="False">
+                                        <ListBox.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ListBox.ItemsPanel>
+                                        <ListBox.ItemContainerStyle>
+                                            <Style TargetType="ListBoxItem">
+                                                <Setter Property="Focusable" Value="False" />
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="ListBoxItem">
+                                                            <ContentPresenter />
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </ListBox.ItemContainerStyle>
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border x:Name="Tile" Width="84" Height="96" CornerRadius="12" Margin="0,0,6,0" Padding="6"
+                                                        Background="Transparent" Cursor="Hand" ToolTip="{Binding Path}"
+                                                        PreviewMouseLeftButtonDown="OnTileDown" MouseMove="OnTileMove"
+                                                        MouseLeftButtonUp="OnTileUp">
+                                                    <Border.ContextMenu>
+                                                        <ContextMenu>
+                                                            <MenuItem Header="Open" Click="OnTileOpen" />
+                                                            <MenuItem Header="Show in folder" Click="OnTileReveal" />
+                                                            <MenuItem Header="Copy path" Click="OnTileCopyPath" />
+                                                            <MenuItem Header="Share…" Click="OnTileShare" />
+                                                            <Separator />
+                                                            <MenuItem Header="Remove from shelf" Click="OnTileRemove" />
+                                                        </ContextMenu>
+                                                    </Border.ContextMenu>
+                                                    <StackPanel>
+                                                        <Image Source="{Binding Icon}" Width="48" Height="48" Stretch="Uniform"
+                                                               RenderOptions.BitmapScalingMode="HighQuality" />
+                                                        <TextBlock Text="{Binding Name}" FontSize="11" TextAlignment="Center" TextWrapping="Wrap"
+                                                                   TextTrimming="CharacterEllipsis" MaxHeight="30" Margin="0,6,0,0" />
+                                                    </StackPanel>
+                                                </Border>
+                                                <DataTemplate.Triggers>
+                                                    <Trigger SourceName="Tile" Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Tile" Property="Background" Value="#17FFFFFF" />
+                                                    </Trigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <Button Style="{StaticResource PillButton}" Click="OnShareAll">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE72D;" FontSize="11" />
+                                                <TextBlock Text="Share all" FontSize="11.5" Margin="6,0,0,0" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Style="{StaticResource PillButton}" Click="OnClearShelf" Margin="6,0,0,0">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE74D;" FontSize="11" />
+                                                <TextBlock Text="Clear" FontSize="11.5" Margin="6,0,0,0" />
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
