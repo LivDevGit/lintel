@@ -79,7 +79,9 @@ public partial class IslandWindow : Window
         _radius = new Spring(ch / 2, 380, 34);
         _collapsedFade = new Spring(1, 500, 45);
         _peekFade = new Spring(0, 500, 45);
-        _expandedFade = new Spring(0, 420, 41);
+        // Quick fade: a part-transparent layer has to be drawn off-screen first on every frame,
+        // so the expanded content becomes opaque early and the growing clip does the reveal.
+        _expandedFade = new Spring(0, 700, 53);
         _shadow = new Spring(0, 300, 35);
         _presence = new Spring(1, 120, 22);
         _springs = new[] { _width, _height, _radius, _collapsedFade, _peekFade, _expandedFade, _shadow, _presence };
@@ -90,7 +92,11 @@ public partial class IslandWindow : Window
         _driftTimer.Start();
 
         SourceInitialized += OnSourceInitialized;
-        Loaded += (_, _) => { ApplyLayoutSettings(); SnapToTargets(); };
+        Loaded += (_, _) =>
+        {
+            ApplyLayoutSettings();
+            SnapToTargets();
+        };
         Closed += OnClosed;
         DpiChanged += (_, _) => Dispatcher.BeginInvoke(() => PlaceOn(Screen), DispatcherPriority.Background);
 
@@ -312,11 +318,20 @@ public partial class IslandWindow : Window
 
     // ================================================================ animation loop
 
+    // Set LINTEL_PERF=1 to log frame timing for every transition.
+    private static readonly bool PerfLog = Environment.GetEnvironmentVariable("LINTEL_PERF") == "1";
+    private readonly System.Diagnostics.Stopwatch _perfClock = new();
+    private int _perfFrames;
+    private double _perfWorstGapMs;
+
     private void StartAnimating()
     {
         if (_animating) return;
         _animating = true;
         _lastFrame = TimeSpan.Zero;
+        _perfFrames = 0;
+        _perfWorstGapMs = 0;
+        _perfClock.Restart();
         CompositionTarget.Rendering += OnRendering;
     }
 
@@ -325,12 +340,19 @@ public partial class IslandWindow : Window
         if (!_animating) return;
         _animating = false;
         CompositionTarget.Rendering -= OnRendering;
+        if (PerfLog && _perfFrames > 1)
+        {
+            var ms = _perfClock.Elapsed.TotalMilliseconds;
+            Log.Write($"[perf] {State}: {_perfFrames} frames in {ms:N0} ms = {_perfFrames * 1000 / ms:N1} fps, worst gap {_perfWorstGapMs:N0} ms");
+        }
     }
 
     private void OnRendering(object? sender, EventArgs e)
     {
         var now = ((RenderingEventArgs)e).RenderingTime;
         if (now == _lastFrame) return;
+        if (_lastFrame != TimeSpan.Zero) _perfWorstGapMs = Math.Max(_perfWorstGapMs, (now - _lastFrame).TotalMilliseconds);
+        _perfFrames++;
         var dt = _lastFrame == TimeSpan.Zero ? 1 / 60.0 : Math.Min((now - _lastFrame).TotalSeconds, 1 / 20.0);
         _lastFrame = now;
 
@@ -357,8 +379,10 @@ public partial class IslandWindow : Window
         ShadowPlate.Width = w;
         ShadowPlate.Height = h;
         ShadowPlate.Margin = Island.Margin;
-        ShadowPlate.CornerRadius = Island.CornerRadius;
-        ShadowPlate.Opacity = Math.Clamp(_shadow.Value, 0, 1);
+        Shadow1.CornerRadius = new CornerRadius(top + 4, top + 4, r + 6, r + 6);
+        Shadow2.CornerRadius = new CornerRadius(top + 9, top + 9, r + 14, r + 14);
+        Shadow3.CornerRadius = new CornerRadius(top + 16, top + 16, r + 24, r + 24);
+        SetLayer(ShadowPlate, _shadow.Value);
 
         Root.Opacity = _hiddenForFullscreen ? 0 : Math.Clamp(_presence.Value, 0, 1);
         SetLayer(CollapsedLayer, _collapsedFade.Value);

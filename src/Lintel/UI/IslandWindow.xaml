@@ -110,13 +110,14 @@
     </Window.Resources>
 
     <Grid x:Name="Root">
-        <!-- Shadow lives on its own plate so the island content isn't re-rendered through an effect. -->
-        <Border x:Name="ShadowPlate" HorizontalAlignment="Center" VerticalAlignment="Top"
-                Background="Black" Opacity="0" IsHitTestVisible="False">
-            <Border.Effect>
-                <DropShadowEffect BlurRadius="30" ShadowDepth="8" Direction="270" Opacity="0.6" Color="Black" />
-            </Border.Effect>
-        </Border>
+        <!-- Shadow made of stacked translucent rings instead of a blur effect: a blur is
+             recomputed on the CPU every animation frame, these are just fills. -->
+        <Grid x:Name="ShadowPlate" HorizontalAlignment="Center" VerticalAlignment="Top"
+              Opacity="0" IsHitTestVisible="False">
+            <Border x:Name="Shadow3" Margin="-16,-6,-16,-26" Background="#0C000000" />
+            <Border x:Name="Shadow2" Margin="-9,-2,-9,-16" Background="#16000000" />
+            <Border x:Name="Shadow1" Margin="-4,0,-4,-7" Background="#24000000" />
+        </Grid>
 
         <Border x:Name="Island" HorizontalAlignment="Center" VerticalAlignment="Top"
                 BorderBrush="#26FFFFFF" BorderThickness="1" AllowDrop="True">

@@ -35,9 +35,11 @@ public partial class App : Application
             return;
         }
 
-        // The island is a small transparent window, which Windows composes from system memory
-        // anyway; software rendering avoids a Direct3D device and its large driver allocations.
-        System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
+        // GPU rendering keeps transitions at the display's refresh rate for about half the CPU of
+        // software rendering. LINTEL_SOFTWARE=1 is a fallback for drivers that mishandle
+        // transparent windows (it caps animations at ~60 fps).
+        if (Environment.GetEnvironmentVariable("LINTEL_SOFTWARE") == "1")
+            System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
 
         DispatcherUnhandledException += OnUnhandled;
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>

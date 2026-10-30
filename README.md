@@ -23,9 +23,13 @@ Right-click the tray icon for Settings and Quit.
 
 ## Lightweight
 
-At rest Lintel uses about **0.5% of one CPU core and ~50 MB of RAM**. The window shrinks to hug the pill when
-nothing is animating, the mouse is polled slowly when it's far away, hidden layers don't render, and audio capture
-for the visualizer only runs while something is playing.
+At rest Lintel uses under **1% of one CPU core and ~40 MB of RAM**, and its transitions run at your display's
+refresh rate (120 fps on a 120 Hz screen). The window shrinks to hug the pill when nothing is animating, the mouse
+is polled slowly when it's far away, hidden layers don't render, shadows are plain fills instead of blur effects,
+and audio capture for the visualizer only runs while something is playing.
+
+If transitions look wrong on your GPU, set the environment variable `LINTEL_SOFTWARE=1` to use software rendering
+(capped at ~60 fps). `LINTEL_PERF=1` logs frame timing for each transition to `%APPDATA%\Lintel\lintel.log`.
 
 ## Requirements
 
