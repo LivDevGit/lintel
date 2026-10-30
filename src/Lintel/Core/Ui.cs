@@ -20,6 +20,15 @@ internal static class Ui
     }
 }
 
+/// <summary>
+/// "Now" for anything time-based on screen. Demo recording swaps in a virtual clock that advances
+/// exactly one frame at a time, so recordings are smooth however long each frame takes to capture.
+/// </summary>
+public static class DemoClock
+{
+    public static Func<DateTimeOffset> Now { get; set; } = () => DateTimeOffset.Now;
+}
+
 internal static class Log
 {
     private static readonly object Gate = new();

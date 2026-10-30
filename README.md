@@ -90,8 +90,10 @@ dotnet publish src/Lintel/Lintel.csproj -c Release -r win-x64 --self-contained -
 To regenerate the README media after UI changes (needs Python with Pillow):
 
 ```bash
-src/Lintel/bin/Release/net8.0-windows10.0.22621.0/Lintel.exe --demo demo-frames
+src/Lintel/bin/Release/net8.0-windows10.0.22621.0/Lintel.exe --demo demo-frames --demo-scale 3
 ```
+
+The demo runs on a virtual clock, so frames come out at an exact 30 fps however long each one takes to capture.
 
 ```bash
 python tools/make_media.py demo-frames docs/media

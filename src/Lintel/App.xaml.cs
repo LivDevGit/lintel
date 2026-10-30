@@ -113,7 +113,14 @@ public partial class App : Application
         _islands.Rebuild();
         try
         {
-            await new DemoDirector(_hub, _islands.Windows[0], output).RunAsync();
+            double Arg(string name, double fallback)
+            {
+                var i = Array.IndexOf(Environment.GetCommandLineArgs(), name);
+                var args = Environment.GetCommandLineArgs();
+                return i >= 0 && i + 1 < args.Length && double.TryParse(args[i + 1], System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : fallback;
+            }
+            await new DemoDirector(_hub, _islands.Windows[0], output, Arg("--demo-scale", 2), Arg("--demo-fps", 30)).RunAsync();
         }
         catch (Exception ex)
         {

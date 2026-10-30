@@ -378,8 +378,26 @@ public partial class IslandWindow : Window
         State = IslandState.Peek;
         _peekTimer.Stop();
         _peekTimer.Interval = TimeSpan.FromSeconds(peek.Kind is PeekKind.Volume or PeekKind.Brightness ? 1.6 : _settings.PeekSeconds);
-        _peekTimer.Start();
+        if (DemoMode) _demoPeekRemaining = _peekTimer.Interval.TotalSeconds;
+        else _peekTimer.Start();
         UpdateTargets();
+    }
+
+    private double _demoPeekRemaining;
+
+    /// <summary>
+    /// Demo recording: advance every animation by exactly <paramref name="dt"/> seconds. The
+    /// render loop is detached in demo mode, so frames depend only on this virtual time.
+    /// </summary>
+    public void AdvanceDemoFrame(double dt)
+    {
+        if (_demoPeekRemaining > 0)
+        {
+            _demoPeekRemaining -= dt;
+            if (_demoPeekRemaining <= 0) EndPeek();
+        }
+        foreach (var s in _springs) s.Step(dt);
+        ApplyFrame();
     }
 
     private void EndPeek()
@@ -456,6 +474,8 @@ public partial class IslandWindow : Window
         PeekLayer.IsHitTestVisible = false;
         ExpandedLayer.IsHitTestVisible = State == IslandState.Expanded;
         SetClickThrough(IsSlimNow);
+        // Snap the vertical drift away quickly when the island moves onto the edge.
+        ApplyDriftY(TimeSpan.FromMilliseconds(250));
         FitWindow(full: true);
         StartAnimating();
     }
@@ -489,14 +509,14 @@ public partial class IslandWindow : Window
         _perfFrames = 0;
         _perfWorstGapMs = 0;
         _perfClock.Restart();
-        CompositionTarget.Rendering += OnRendering;
+        if (!DemoMode) CompositionTarget.Rendering += OnRendering;
     }
 
     private void StopAnimating()
     {
         if (!_animating) return;
         _animating = false;
-        CompositionTarget.Rendering -= OnRendering;
+        if (!DemoMode) CompositionTarget.Rendering -= OnRendering;
         if (PerfLog && _perfFrames > 1)
         {
             var ms = _perfClock.Elapsed.TotalMilliseconds;
@@ -571,6 +591,7 @@ public partial class IslandWindow : Window
 
     private void OnTick(object? sender, EventArgs e)
     {
+        if (DemoMode) return; // demo frames are driven by the director, not the pointer
         _tickCount++;
         if (_tickCount % 12 == 0)
         {
@@ -663,18 +684,27 @@ public partial class IslandWindow : Window
     /// <summary>OLED care: move a few pixels so the island's edges don't burn into one spot.</summary>
     private void Drift()
     {
-        double x = 0, y = 0;
-        if (_settings.PixelShift)
-        {
-            x = _random.Next(-8, 9);
-            // Attached islands have to stay touching the top edge.
-            y = _settings.Style == IslandStyle.Floating ? _random.Next(-3, 4) : 0;
-        }
-        var ease = new System.Windows.Media.Animation.SineEase();
+        _driftX = _settings.PixelShift ? _random.Next(-8, 9) : 0;
+        _driftY = _settings.PixelShift ? _random.Next(-3, 4) : 0;
         _drift.BeginAnimation(TranslateTransform.XProperty,
-            new System.Windows.Media.Animation.DoubleAnimation(x, TimeSpan.FromSeconds(3)) { EasingFunction = ease });
+            new System.Windows.Media.Animation.DoubleAnimation(_driftX, TimeSpan.FromSeconds(3)) { EasingFunction = new System.Windows.Media.Animation.SineEase() });
+        ApplyDriftY(TimeSpan.FromSeconds(3));
+    }
+
+    private double _driftX, _driftY;
+
+    /// <summary>
+    /// The vertical part of pixel shift only applies while the island floats below the edge.
+    /// Anything that sits on the edge (the slim bar, the reserved strip, Attached style) shifts
+    /// sideways only, so it never leaves a gap above it or slides off screen.
+    /// </summary>
+    private void ApplyDriftY(TimeSpan duration)
+    {
+        var onEdge = _settings.Style == IslandStyle.Attached || IsSlimNow || IsReserveResting;
+        var y = onEdge ? 0 : _driftY;
+        if (Math.Abs(_drift.Y - y) < 0.01 && !_drift.HasAnimatedProperties) return;
         _drift.BeginAnimation(TranslateTransform.YProperty,
-            new System.Windows.Media.Animation.DoubleAnimation(y, TimeSpan.FromSeconds(3)) { EasingFunction = ease });
+            new System.Windows.Media.Animation.DoubleAnimation(y, duration) { EasingFunction = new System.Windows.Media.Animation.SineEase() });
     }
 
     private void CheckFullscreen()

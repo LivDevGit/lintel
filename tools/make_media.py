@@ -42,12 +42,14 @@ def alpha_bbox(paths):
     return box
 
 
-def scene(name, scale=0.62, fps=20):
+def scene(name, fps=30):
     paths = sorted(glob.glob(os.path.join(DEMO, name, "f*.png")))
     first = Image.open(paths[0])
     W, H = first.size
+    # Frames cover the 660 DIP-wide window at whatever --demo-scale was used; aim for 1.24 px per DIP.
+    scale = 1.24 / (W / 660)
     box = alpha_bbox(paths)
-    pad = 70
+    pad = int(35 * W / 660)
     left, right = max(0, box[0] - pad), min(W, box[2] + pad)
     bottom = min(H, box[3] + pad)
     crop = (left, 0, right, bottom)  # keep the top edge: the island lives at the top of a screen

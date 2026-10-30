@@ -100,10 +100,13 @@ public sealed class Hub : ObservableObject, IDisposable
         }
 
         _clock.Tick += (_, _) => OnClock();
-        _clock.Start();
+        if (!demo) _clock.Start(); // the demo director ticks the clock once per recorded frame
         OnClock();
         BuildEvents();
     }
+
+    /// <summary>Demo recording: advance the once-a-tick work (progress, clock) by hand.</summary>
+    public void DemoTick() => OnClock();
 
     // ---------------------------------------------------------------- media
 

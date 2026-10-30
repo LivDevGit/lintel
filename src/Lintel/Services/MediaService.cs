@@ -35,7 +35,7 @@ public sealed record MediaSnapshot
         {
             var pos = Position;
             if (IsPlaying && PositionStamp != default)
-                pos += DateTimeOffset.Now - PositionStamp;
+                pos += DemoClock.Now() - PositionStamp;
             if (Duration > TimeSpan.Zero && pos > Duration) pos = Duration;
             return pos < TimeSpan.Zero ? TimeSpan.Zero : pos;
         }

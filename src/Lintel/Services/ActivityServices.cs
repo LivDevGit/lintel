@@ -111,33 +111,30 @@ public sealed class SpectrumService : IDisposable
 
     /// <summary>Demo mode: animate plausible bars instead of capturing real audio.</summary>
     public bool Simulated { get; set; }
-    private System.Windows.Threading.DispatcherTimer? _simulation;
+    private object? _simulation;
     private readonly Random _random = new(7);
     private double _phase;
 
-    private void StartSimulation()
+    /// <summary>Demo recording: advance the simulated bars by one frame (a 120 bpm pulse).</summary>
+    public void SimulateStep(double dt)
     {
-        _simulation = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(42) };
-        _simulation.Tick += (_, _) =>
+        if (_simulation == null) return;
+        _phase += dt;
+        var beat = Math.Pow(Math.Max(0, Math.Sin(_phase * Math.PI * 2 * 2.0)), 6);
+        for (var b = 0; b < Bands; b++)
         {
-            _phase += 0.042;
-            var beat = Math.Pow(Math.Max(0, Math.Sin(_phase * Math.PI * 2 * 2.0)), 6); // ~120 bpm pulse
-            for (var b = 0; b < Bands; b++)
-            {
-                var body = 0.35 + 0.25 * Math.Sin(_phase * (2.1 + b * 0.9) + b);
-                var target = Math.Clamp(body + beat * (0.55 - b * 0.06) + (_random.NextDouble() - 0.5) * 0.18, 0.08, 1);
-                Levels[b] = (float)(Levels[b] * 0.45 + target * 0.55);
-            }
-            Updated?.Invoke();
-        };
-        _simulation.Start();
+            var body = 0.35 + 0.25 * Math.Sin(_phase * (2.1 + b * 0.9) * 2 + b);
+            var target = Math.Clamp(body + beat * (0.55 - b * 0.06) + (_random.NextDouble() - 0.5) * 0.18, 0.08, 1);
+            Levels[b] = (float)(Levels[b] * 0.45 + target * 0.55);
+        }
+        Updated?.Invoke();
     }
 
     public void Start()
     {
         if (Simulated)
         {
-            if (_simulation == null) StartSimulation();
+            _simulation ??= new object();
             return;
         }
         if (_capture != null) return;
@@ -160,7 +157,6 @@ public sealed class SpectrumService : IDisposable
     {
         if (_simulation != null)
         {
-            _simulation.Stop();
             _simulation = null;
             Array.Clear(Levels);
             Updated?.Invoke();

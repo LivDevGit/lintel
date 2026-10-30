@@ -13,119 +13,148 @@ using Lintel.ViewModels;
 namespace Lintel.UI;
 
 /// <summary>
-/// <c>Lintel.exe --demo &lt;folder&gt;</c> plays scripted scenes on the real island with made-up
-/// data (a fictional track, generated cover art, simulated power events) and records each scene
-/// as PNG frames with a transparent background. Nothing real is read or saved.
+/// <c>Lintel.exe --demo &lt;folder&gt; [--demo-scale 3] [--demo-fps 30]</c> plays scripted scenes on the
+/// real island with made-up data (a fictional track, generated cover art, simulated power events)
+/// and records each scene as PNG frames with a transparent background. Time is virtual: every
+/// animation advances exactly one frame per capture, so the output is smooth at any capture speed.
+/// Nothing real is read or saved.
 /// </summary>
 public sealed class DemoDirector
 {
-    private const double Fps = 20;
     private readonly Hub _hub;
     private readonly IslandWindow _window;
     private readonly string _output;
+    private readonly double _scale;
+    private readonly double _fps;
 
-    public DemoDirector(Hub hub, IslandWindow window, string output)
+    private readonly DateTimeOffset _epoch = DateTimeOffset.Now;
+    private double _virtualSeconds;
+    private string? _recordingFolder;
+    private int _frameIndex;
+    private readonly List<Task> _pending = new();
+
+    /// <param name="scale">Pixels per device-independent pixel for recorded frames.</param>
+    /// <param name="fps">Frames per virtual second.</param>
+    public DemoDirector(Hub hub, IslandWindow window, string output, double scale = 2, double fps = 30)
     {
         _hub = hub;
         _window = window;
         _output = output;
+        _scale = scale;
+        _fps = fps;
     }
 
     public async Task RunAsync()
     {
         Directory.CreateDirectory(_output);
-        await Task.Delay(800);
+        DemoClock.Now = () => _epoch + TimeSpan.FromSeconds(_virtualSeconds);
+        await Wait(0.5);
 
         var midnight = Track("Midnight Drive", "Neon Harbor", Cover(Color.FromRgb(0xFF, 0x4F, 0x8B), Color.FromRgb(0x3A, 0x1C, 0x71), 3), 42, 218);
         var coast = Track("Glass Coast", "Polar Youth", Cover(Color.FromRgb(0x2E, 0xC4, 0xB6), Color.FromRgb(0x0B, 0x3D, 0x5C), 11), 5, 196);
         _hub.Calendar.Inject(SampleAgenda());
         _hub.Battery.Inject(new BatterySnapshot(true, 64, false, false, false, null, 245));
+        await Wait(0.5);
 
         // 1. Power: plug in, then unplug.
         await Record("power", async () =>
         {
-            await Task.Delay(1200);
+            await Wait(1.2);
             _hub.Battery.Inject(new BatterySnapshot(true, 64, true, true, false, 72, null));
-            await Task.Delay(3400);
+            await Wait(3.4);
             _hub.Battery.Inject(new BatterySnapshot(true, 64, false, false, false, null, 245));
-            await Task.Delay(3400);
+            await Wait(3.4);
         });
 
         // 2. Music: a song starts, the pill comes alive, open it, pause/play, skip.
         await Record("music", async () =>
         {
-            await Task.Delay(800);
-            _hub.Media.Inject(midnight);
-            await Task.Delay(4600);
+            await Wait(0.8);
+            _hub.Media.Inject(midnight with { PositionStamp = DemoClock.Now() });
+            await Wait(4.6);
             _window.Expand(IslandTab.Home, byPointer: false);
-            await Task.Delay(3200);
-            _hub.Media.Inject(_hub.Media.Current with { IsPlaying = false, Position = _hub.Media.Current.LivePosition, PositionStamp = DateTimeOffset.Now });
-            await Task.Delay(1300);
-            _hub.Media.Inject(_hub.Media.Current with { IsPlaying = true, PositionStamp = DateTimeOffset.Now });
-            await Task.Delay(1500);
-            _hub.Media.Inject(coast);
-            await Task.Delay(2600);
+            await Wait(3.2);
+            var m = _hub.Media.Current;
+            _hub.Media.Inject(m with { IsPlaying = false, Position = m.LivePosition, PositionStamp = DemoClock.Now() });
+            await Wait(1.3);
+            _hub.Media.Inject(_hub.Media.Current with { IsPlaying = true, PositionStamp = DemoClock.Now() });
+            await Wait(1.5);
+            _hub.Media.Inject(coast with { PositionStamp = DemoClock.Now() });
+            await Wait(2.6);
             _window.Collapse();
-            await Task.Delay(1500);
+            await Wait(1.5);
         });
 
         // 3. Volume: a few key presses' worth of changes.
         await Record("volume", async () =>
         {
-            await Task.Delay(700);
+            await Wait(0.7);
             foreach (var level in new[] { 0.30f, 0.36f, 0.42f, 0.48f, 0.54f, 0.60f })
             {
                 _hub.SimulateVolume(level);
-                await Task.Delay(140);
+                await Wait(0.14);
             }
-            await Task.Delay(2400);
+            await Wait(2.4);
         });
 
         // 4. Shelf: parked files.
         foreach (var file in SampleFiles()) _hub.Shelf.AddPaths(new[] { file });
         await Record("shelf", async () =>
         {
-            await Task.Delay(600);
+            await Wait(0.6);
             _window.Expand(IslandTab.Shelf, byPointer: false);
-            await Task.Delay(3000);
+            await Wait(3.0);
             _window.Collapse();
-            await Task.Delay(1200);
+            await Wait(1.2);
         });
 
         // 5. A still of the open island for the banner.
-        _hub.Media.Inject(midnight with { PositionStamp = DateTimeOffset.Now });
+        _hub.Media.Inject(midnight with { PositionStamp = DemoClock.Now() });
         _window.Expand(IslandTab.Home, byPointer: false);
-        await Task.Delay(1500);
+        await Wait(1.5);
         await SaveFrame(Path.Combine(_output, "hero.png"), scale: 3);
         _window.Collapse();
-        await Task.Delay(600);
+        await Wait(0.6);
+        await Task.WhenAll(_pending);
     }
 
-    // ------------------------------------------------------------------ recording
+    // ------------------------------------------------------------------ virtual time & recording
+
+    /// <summary>Advances virtual time frame by frame, capturing each frame while a scene records.</summary>
+    private async Task Wait(double seconds)
+    {
+        var frames = Math.Max(1, (int)Math.Round(seconds * _fps));
+        var dt = 1 / _fps;
+        for (var i = 0; i < frames; i++)
+        {
+            _virtualSeconds += dt;
+            _hub.Spectrum.SimulateStep(dt);
+            _hub.DemoTick();
+            _window.AdvanceDemoFrame(dt);
+            // Let bindings, item generation and layout settle before the frame is captured.
+            await Dispatcher.Yield(DispatcherPriority.Background);
+            _window.UpdateLayout();
+            if (_recordingFolder != null)
+                _pending.Add(SaveFrame(Path.Combine(_recordingFolder, $"f{_frameIndex++:D4}.png"), _scale));
+        }
+    }
 
     private async Task Record(string scene, Func<Task> script)
     {
-        var folder = Path.Combine(_output, scene);
-        Directory.CreateDirectory(folder);
-        var index = 0;
-        var pending = new List<Task>();
-        // Frames can't always be captured exactly on schedule, so keep each one's real time;
-        // the animation is then assembled with true durations and plays at real speed.
-        var clock = System.Diagnostics.Stopwatch.StartNew();
-        var times = new List<long>();
-        var timer = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(1000 / Fps) };
-        timer.Tick += (_, _) =>
-        {
-            times.Add(clock.ElapsedMilliseconds);
-            pending.Add(SaveFrame(Path.Combine(folder, $"f{index++:D4}.png"), scale: 2));
-        };
-        timer.Start();
+        _recordingFolder = Path.Combine(_output, scene);
+        Directory.CreateDirectory(_recordingFolder);
+        _frameIndex = 0;
         await script();
-        timer.Stop();
-        times.Add(clock.ElapsedMilliseconds);
-        await Task.WhenAll(pending);
-        await File.WriteAllLinesAsync(Path.Combine(folder, "times.txt"), times.ConvertAll(t => t.ToString()));
-        Log.Write($"[demo] {scene}: {index} frames in {clock.ElapsedMilliseconds} ms");
+        var frames = _frameIndex;
+        _recordingFolder = null;
+        await Task.WhenAll(_pending);
+        _pending.Clear();
+
+        // Uniform timing, in the same format the media tools read.
+        var times = new List<string>();
+        for (var i = 0; i <= frames; i++) times.Add(((long)Math.Round(i * 1000 / _fps)).ToString());
+        await File.WriteAllLinesAsync(Path.Combine(_output, scene, "times.txt"), times);
+        Log.Write($"[demo] {scene}: {frames} frames ({frames / _fps:N1} s at {_fps} fps)");
     }
 
     /// <summary>Renders the window's content on the UI thread; encodes the PNG on a worker.</summary>
@@ -163,7 +192,7 @@ public sealed class DemoDirector
         CanSeek = true,
         Position = TimeSpan.FromSeconds(positionSeconds),
         Duration = TimeSpan.FromSeconds(durationSeconds),
-        PositionStamp = DateTimeOffset.Now,
+        PositionStamp = DemoClock.Now(),
     };
 
     /// <summary>Abstract generated cover art: a gradient with soft orbs and a ring.</summary>

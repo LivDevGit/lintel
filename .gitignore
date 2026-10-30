@@ -5,6 +5,7 @@ publish/
 *.user
 .vs/
 demo-frames/
+brag-output*/
 
 # Third-party reference material: never commit these
 *.dmg
