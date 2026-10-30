@@ -7,6 +7,20 @@
 A dynamic island for the top of your Windows 11 screen. It rests as a small pill, shows what's playing, flashes
 volume, brightness and power changes, keeps today's agenda one hover away, and holds files you drop on it.
 
+## Install
+
+**[Download the latest release](https://github.com/LivDevGit/lintel/releases/latest)** and pick one:
+
+- **`Lintel-Setup-x.y.z.exe`** (recommended): installs for your user account (no administrator prompt), adds
+  Lintel to the Start menu, can start it with Windows, and uninstalls from Settings → Apps.
+- **`Lintel-x.y.z-portable-win-x64.zip`**: unzip anywhere and run `Lintel.exe`. Nothing is installed.
+
+Both include everything Lintel needs; you don't have to install .NET separately.
+
+> Lintel isn't code-signed yet, so the first time you run it Windows SmartScreen may say
+> "Windows protected your PC". Click **More info → Run anyway**. The source is all here if you'd rather build it
+> yourself.
+
 ## See it in action
 
 **Something starts playing.** The island announces the track, then the pill shows the cover, the title and a live
@@ -81,10 +95,11 @@ dotnet build src/Lintel/Lintel.csproj -c Release
 
 The app is written to `src/Lintel/bin/Release/net8.0-windows10.0.22621.0/Lintel.exe`.
 
-To get a self-contained single file that needs no installed runtime:
+To build the installer and the portable zip into `dist/` (needs [Inno Setup 6](https://jrsoftware.org/isinfo.php),
+`winget install JRSoftware.InnoSetup`):
 
-```bash
-dotnet publish src/Lintel/Lintel.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
+```powershell
+.\installer\build.ps1
 ```
 
 To regenerate the README media after UI changes (needs Python with Pillow):

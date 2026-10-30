@@ -14,6 +14,9 @@
     <Version>0.1.0</Version>
     <Product>Lintel</Product>
     <Description>A dynamic top-of-screen island for Windows 11.</Description>
+    <ApplicationIcon>Assets\lintel.ico</ApplicationIcon>
+    <Authors>Liviu Iorga</Authors>
+    <Copyright>Copyright (c) 2026 Liviu Iorga</Copyright>
     <!-- WPF takes per-monitor DPI awareness from app.manifest; this WinForms hint doesn't apply. -->
     <NoWarn>$(NoWarn);WFAC010</NoWarn>
     <!-- Lightweight background app: no background GC thread, smaller heap reservations. -->
